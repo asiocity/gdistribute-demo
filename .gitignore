@@ -1,0 +1,6 @@
+# file
+*.log
+
+# folder
+tmp/
+build/

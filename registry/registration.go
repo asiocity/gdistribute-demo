@@ -5,8 +5,12 @@ type ServiceName string
 type Registration struct {
 	ServiceName ServiceName
 	ServiceURL  string
-	// RequiredServices []ServiceName // 存放服务依赖的服务
-	// ServiceUpdateURL string        // 用于和服务注册中心沟通
+	// 存放服务依赖的服务
+	RequiredServices []ServiceName
+	// 存放服务自己的 URL 地址, 当自己依赖用的服务发生变更, 可以让注册中心通过这个地址告知服务
+	ServiceUpdateURL string
+	// 用于做心跳检查
+	HeartbeatURL string
 }
 
 const (
@@ -20,6 +24,6 @@ type patchEntry struct {
 }
 
 type patch struct {
-	Added []patchEntry
-	Deled []patchEntry
+	Added   []patchEntry
+	Removed []patchEntry
 }

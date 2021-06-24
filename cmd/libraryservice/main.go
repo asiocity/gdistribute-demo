@@ -17,10 +17,11 @@ func main() {
 	r := registry.Registration{
 		ServiceName: registry.LibraryService,
 		ServiceURL:  serviceAddr,
-		// RequiredServices: []registry.ServiceName{
-		// 	registry.LibraryService,
-		// },
-		// ServiceUpdateURL: serviceAddr + "/services",
+		RequiredServices: []registry.ServiceName{
+			registry.LogService,
+		},
+		ServiceUpdateURL: serviceAddr + "/services",
+		HeartbeatURL:     serviceAddr + "/heartbeat",
 	}
 	ctx, err := service.Start(
 		context.Background(),
@@ -36,6 +37,8 @@ func main() {
 	if logProvider, err := registry.GetProvider(registry.LogService); err == nil {
 		fmt.Printf("Logging service found at: %s\n", logProvider)
 		log.SetClientLogger(logProvider, r.ServiceName)
+	} else {
+		fmt.Println(err)
 	}
 
 	// 等待停止

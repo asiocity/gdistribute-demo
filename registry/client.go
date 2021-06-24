@@ -7,18 +7,26 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-
-	// "net/url"
+	"net/url"
 	"sync"
 )
 
 // 用于给 RegistryService 发送一个 POST 请求
 func RegisterService(r Registration) error {
-	// serviceUpdateURL, err := url.Parse(r.ServiceUpdateURL)
-	// if err != nil {
-	// 	return err
-	// }
-	// http.Handle(serviceUpdateURL.Path, &serviceUpdateHandler{})
+	heartbeatURL, err := url.Parse(r.HeartbeatURL)
+	if err != nil {
+		return err
+	}
+	http.HandleFunc(heartbeatURL.Path, func(w http.ResponseWriter, r *http.Request) {
+		// 如果是生产环境一般还会返回 CPU MEM 等其他信息
+		w.WriteHeader(http.StatusOK)
+	})
+
+	serviceUpdateURL, err := url.Parse(r.ServiceUpdateURL)
+	if err != nil {
+		return err
+	}
+	http.Handle(serviceUpdateURL.Path, &serviceUpdateHandler{})
 
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
@@ -45,6 +53,7 @@ func (sh *serviceUpdateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	// 只允许 post
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
 	}
 
 	dec := json.NewDecoder(r.Body)
@@ -55,6 +64,7 @@ func (sh *serviceUpdateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	fmt.Printf("Updated reviced %v\n", p)
 	prov.Update(p)
 }
 
@@ -89,18 +99,21 @@ type providers struct {
 	lock     *sync.RWMutex
 }
 
-func (p *providers) Update(pa patch) {
+func (p *providers) Update(pat patch) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	for _, patchEntry := range pa.Added {
-		// 如果服务名称存在
+	// added
+	for _, patchEntry := range pat.Added {
+		// 如果服务名称不存在
 		if _, ok := p.services[patchEntry.Name]; !ok {
 			p.services[patchEntry.Name] = make([]string, 0)
 		}
 		p.services[patchEntry.Name] = append(p.services[patchEntry.Name], patchEntry.URL)
 	}
-	for _, patchEntry := range pa.Deled {
+
+	// removed
+	for _, patchEntry := range pat.Removed {
 		// 如果服务名称存在
 		if providerURLs, ok := p.services[patchEntry.Name]; ok {
 			for i := range providerURLs {
@@ -112,6 +125,8 @@ func (p *providers) Update(pa patch) {
 	}
 }
 
+// 使用服务名称来找到它的 URL
+// 偷懒, 本来该返回 []string
 func (p providers) get(name ServiceName) (string, error) {
 	providers, ok := p.services[name]
 	if !ok {
